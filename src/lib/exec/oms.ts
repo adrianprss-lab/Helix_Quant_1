@@ -492,7 +492,14 @@ export async function pullOrders(bridgeId: number, limit = 5): Promise<DispatchO
   const rows = await db
     .select()
     .from(executionOrders)
-    .where(and(eq(executionOrders.state, "PENDING"), eq(executionOrders.bridgeId, bridgeId)))
+    .where(
+      and(
+        eq(executionOrders.state, "PENDING"),
+        eq(executionOrders.bridgeId, bridgeId),
+        // never hand out an order whose TTL already elapsed
+        or(isNull(executionOrders.expiresAt), sql`${executionOrders.expiresAt} > now()`),
+      ),
+    )
     .orderBy(executionOrders.id)
     .limit(limit);
   if (!rows.length) return [];
@@ -533,11 +540,19 @@ export async function expireStaleOrders(): Promise<number> {
         sql`${executionOrders.dispatchedAt} < now() - interval '45 seconds'`,
       ),
     );
+  const controlsNow = await getControls();
   for (const row of stuck) {
     if (row.attempts < 3) {
       await db
         .update(executionOrders)
-        .set({ state: "PENDING", updatedAt: new Date(), errorText: `no ack after dispatch (attempt ${row.attempts}) - requeued` })
+        .set({
+          state: "PENDING",
+          updatedAt: new Date(),
+          // a requeued order gets a FRESH clock: stale signals must not be
+          // executed minutes later at prices the model never saw
+          expiresAt: new Date(Date.now() + controlsNow.orderTtlSeconds * 1000),
+          errorText: `no ack after dispatch (attempt ${row.attempts}) - requeued`,
+        })
         .where(eq(executionOrders.id, row.id));
       await logEvent("warn", "order", `order #${row.id} got no agent ack - requeued (attempt ${row.attempts}/3)`, row.id);
     } else {

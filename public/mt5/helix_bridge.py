@@ -53,7 +53,7 @@ def http(method, url, data=None, timeout=15):
         return 0, str(exc)
 
 MAGIC = 990011
-PY_VERSION = "py-1.11"
+PY_VERSION = "py-1.12"
 SUCCESS_RETCODES = (10008, 10009, 10010)
 
 CFG_NAME = "helix_config.ini"
@@ -332,9 +332,16 @@ class Terminal:
             if marker in (p.comment or ""):
                 return p
         now = int(time.time())
-        if self.mt5.history_select(now - 3 * 86400, now + 60):
-            for d in self.mt5.history_deals_get() or []:
-                if d.magic == self.magic and marker in (d.comment or ""):
+        # The python package has no history_select(); date-range getters are
+        # the select step already. Guarded so a broker quirk can never kill us.
+        deals = None
+        try:
+            deals = self.mt5.history_deals_get(now - 3 * 86400, now + 60)
+        except Exception:
+            deals = None
+        if deals:
+            for d in deals:
+                if getattr(d, "magic", 0) == self.magic and marker in (getattr(d, "comment", "") or ""):
                     return True
         return None
 
@@ -694,7 +701,11 @@ class Bridge:
             done += 1
             o = parse_order_line(line[len("order="):])
             if o:
-                self.execute(o)
+                try:
+                    self.execute(o)
+                except Exception as exc:
+                    err("Order #%d lief auf einen Bridge-Fehler: %s" % (o["id"], exc))
+                    self.ack(o["id"], "REJECTED", 0, "bridge exception: %s" % exc)
             if done >= n:
                 break
 
@@ -770,6 +781,7 @@ class Bridge:
     def manage(self):
         mt5 = self.term.mt5
         for p in self.term.positions():
+          try:
             si = mt5.symbol_info(p.symbol)
             if si is None:
                 continue
@@ -807,6 +819,8 @@ class Bridge:
             if changed and not self.dry:
                 if self.term.modify(p, round(new_sl, digits), round(new_tp, digits)):
                     ok("%s: SL nachgezogen auf %.5f (R=%.2f)" % (p.symbol, new_sl, r_now))
+          except Exception as exc:
+            err("Position %s konnte nicht verwaltet werden: %s" % (getattr(p, "ticket", "?"), exc))
 
     # ------------------------------------------------------------------ loop
     def run(self):
