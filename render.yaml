@@ -1,0 +1,26 @@
+# Render Blueprint — one click deployment for HELIX QUANT
+#
+# Prerequisite: an external Postgres (Neon free tier recommended).
+# Create it first, then set DATABASE_URL in the Render dashboard when prompted
+# (the blueprint marks it as manual/sync:false).
+#
+# Import: Render dashboard -> New -> Blueprint -> connect this repository.
+# Render reads this file and pre-fills everything below.
+
+services:
+  - type: web
+    name: helix-quant
+    runtime: node
+    plan: free
+    region: frankfurt
+    buildCommand: npm install && npm run build
+    startCommand: npx drizzle-kit push && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATABASE_URL
+        sync: false
+      # optional MetaApi cloud adapter
+      # - key: METAAPI_TOKEN
+      #   sync: false

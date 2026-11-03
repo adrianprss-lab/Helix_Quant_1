@@ -1,0 +1,347 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   HELIX QUANT — design system
+   Design language inspired by linear.app: near-black canvas, hairline
+   borders, one quiet violet accent, money colours reserved for P&L only.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* neutrals: canvas -> hairline -> ink ------------------------------------ */
+  --color-slate-950: #08090a;
+  --color-slate-900: #0e0f11;
+  --color-slate-800: #1b1d21;
+  --color-slate-700: #26292e;
+  --color-slate-600: #3a3f46;
+  --color-slate-500: #8a8f98;
+  --color-slate-400: #9ba1ab;
+  --color-slate-300: #b7bdc7;
+  --color-slate-200: #d0d6e0;
+  --color-slate-100: #e8ebf0;
+  --color-slate-50: #f7f8fa;
+
+  /* money ------------------------------------------------------------------- */
+  --color-emerald-500: #26b265;
+  --color-emerald-400: #4cb782;
+  --color-emerald-300: #7bd0a5;
+  --color-rose-500: #e5484d;
+  --color-rose-400: #eb5757;
+  --color-rose-300: #f2838a;
+  --color-amber-500: #f5a524;
+  --color-amber-400: #f7b955;
+  --color-amber-300: #f9cd7d;
+  --color-sky-500: #52a9ff;
+  --color-sky-400: #6fb8ff;
+  --color-sky-300: #9ccaff;
+  --color-indigo-500: #5e6ad2;
+  --color-indigo-400: #7c86f0;
+
+  --font-sans:
+    "Inter", "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui,
+    -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "SF Mono", "Cascadia Code", "JetBrains Mono", ui-monospace, Menlo, Consolas,
+    monospace;
+}
+
+:root {
+  --accent: #5e6ad2;
+  --accent-soft: rgba(94, 106, 210, 0.14);
+  --accent-ink: #98a0ff;
+  --hairline: rgba(255, 255, 255, 0.07);
+  --panel: #0e0f11;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ---------------------------------------------------------------- canvas -- */
+body {
+  color: #d0d6e0;
+  background:
+    radial-gradient(1100px 520px at 12% -12%, rgba(94, 106, 210, 0.18), transparent 62%),
+    radial-gradient(880px 420px at 88% -6%, rgba(76, 183, 130, 0.08), transparent 60%),
+    radial-gradient(1400px 700px at 50% 118%, rgba(94, 106, 210, 0.1), transparent 65%),
+    #08090a;
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* faint engineering grid, masked to the top of the page -------------------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 90% 55% at 50% -5%, #000 0%, transparent 72%);
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+::selection {
+  background: rgba(94, 106, 210, 0.35);
+  color: #f2f4f8;
+}
+
+/* page-level legacy surfaces become transparent so the glow shows ---------- */
+.bg-\[\#05070d\] {
+  background: transparent !important;
+}
+.bg-\[\#05070d\]\/95 {
+  background-color: rgba(8, 9, 10, 0.82) !important;
+}
+.bg-\[\#080b14\],
+thead.bg-\[\#080b14\] {
+  background-color: var(--panel) !important;
+}
+
+/* ----------------------------------------------------------------- chrome -- */
+header {
+  background: rgba(8, 9, 10, 0.72);
+  backdrop-filter: blur(16px) saturate(1.3);
+  border-bottom: 1px solid var(--hairline);
+}
+
+header .grid.h-9 {
+  border: 1px solid rgba(94, 106, 210, 0.45) !important;
+  background: var(--accent-soft) !important;
+  color: var(--accent-ink) !important;
+  border-radius: 10px;
+  box-shadow: 0 0 24px -6px rgba(94, 106, 210, 0.45);
+}
+
+footer {
+  border-top: 1px solid var(--hairline);
+  background: rgba(8, 9, 10, 0.6);
+}
+
+/* ------------------------------------------------------------------ cards -- */
+section {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0) 42%),
+    var(--panel);
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.035),
+    0 16px 40px -24px rgba(0, 0, 0, 0.85);
+}
+
+section > header {
+  background: transparent;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* ------------------------------------------------------------------- type -- */
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.01em;
+}
+
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+thead th {
+  font-weight: 500;
+}
+
+tbody tr {
+  transition: background 0.12s ease;
+}
+tbody tr:hover {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+a {
+  color: var(--accent-ink);
+}
+
+/* ----------------------------------------------------------------- inputs -- */
+input,
+select,
+textarea {
+  color: #d0d6e0;
+  background-color: #0a0b0d;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid rgba(94, 106, 210, 0.45);
+  outline-offset: 1px;
+  border-color: rgba(94, 106, 210, 0.5) !important;
+}
+input[type="range"],
+input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+/* --------------------------------------------------------------- controls -- */
+button {
+  transition:
+    background 0.14s ease,
+    border-color 0.14s ease,
+    color 0.14s ease,
+    transform 0.06s ease;
+}
+button:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+/* primary actions: the single brand accent --------------------------------- */
+button.border-emerald-500\/40.bg-emerald-500\/15,
+button.border-emerald-500\/40.bg-emerald-500\/10 {
+  border-color: rgba(94, 106, 210, 0.5) !important;
+  background: var(--accent-soft) !important;
+  color: var(--accent-ink) !important;
+  font-weight: 600;
+}
+button.border-emerald-500\/40.bg-emerald-500\/15:hover,
+button.border-emerald-500\/40.bg-emerald-500\/10:hover {
+  background: rgba(94, 106, 210, 0.22) !important;
+  border-color: rgba(94, 106, 210, 0.7) !important;
+}
+
+/* active tab ---------------------------------------------------------------- */
+nav button.border-emerald-500 {
+  border-color: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  font-weight: 600;
+}
+
+/* pills & status chips stay legible on the new canvas ----------------------- */
+span.rounded.border {
+  backdrop-filter: blur(4px);
+}
+
+/* -------------------------------------------------------------- scrollbar -- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #26292e transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #26292e;
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #3a3f46;
+  background-clip: content-box;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ================================================================ hero kit */
+.grad-text {
+  background: linear-gradient(94deg, #ffffff 0%, #c9cdff 42%, #7c86f0 78%, #5e6ad2 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.hero-panel {
+  background:
+    radial-gradient(120% 150% at 0% 0%, rgba(94, 106, 210, 0.18), transparent 52%),
+    radial-gradient(90% 130% at 100% 8%, rgba(76, 183, 130, 0.09), transparent 55%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+    #0c0d0f;
+}
+
+.brand-mark {
+  background: linear-gradient(160deg, #7b85ec, #4a54b8);
+  color: #fff;
+  border: none;
+  box-shadow: 0 6px 20px -6px rgba(94, 106, 210, 0.7);
+}
+
+/* gradient hairline ring (linear.app style) -------------------------------- */
+.gcard {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(255, 255, 255, 0.008)),
+    #0d0e10;
+}
+.gcard::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.05) 32%,
+    rgba(94, 106, 210, 0.18)
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.lift {
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+.lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 44px -22px rgba(0, 0, 0, 0.9);
+}
+
+.tab-active {
+  background: linear-gradient(180deg, #6b76e8, #5560c4);
+}
+
+/* live pulse dot ------------------------------------------------------------ */
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #3a3f46;
+  display: inline-block;
+}
+.dot-live {
+  background: #4cb782;
+  animation: pulse-dot 2s ease-out infinite;
+}
+@keyframes pulse-dot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(76, 183, 130, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(76, 183, 130, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(76, 183, 130, 0);
+  }
+}
+
+/* film grain over the whole stage ------------------------------------------- */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
+}

@@ -1,0 +1,7 @@
+# Ersetze den Hostnamen durch DEINE Domain (muss auf die VPS-IP zeigen).
+# Danach: docker compose --profile tls up -d
+# Caddy erledigt DNS-Check + Let's-Encrypt-Zertifikat automatisch.
+
+helix.DEINE-DOMAIN.de {
+	reverse_proxy app:3000
+}

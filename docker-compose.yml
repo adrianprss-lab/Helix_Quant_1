@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: helix
+      POSTGRES_PASSWORD: helix-change-me
+      POSTGRES_DB: helix
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helix -d helix"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://helix:helix-change-me@db:5432/helix
+      # optional: MetaApi cloud adapter
+      # METAAPI_TOKEN: ""
+      # METAAPI_REGION: new-york
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Optional HTTPS in front: domain auf die VPS-IP zeigen lassen, dann
+  #   docker compose --profile tls up -d
+  # Caddy holt sich das Zertifikat automatisch.
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["tls"]
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+    depends_on:
+      - app
+
+volumes:
+  dbdata:
+  caddydata:
