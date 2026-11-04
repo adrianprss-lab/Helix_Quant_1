@@ -1115,6 +1115,23 @@ export async function autoDispatchFromSignals(args: {
   const { scanSignals, PRESETS } = await import("@/lib/quant/pipeline");
   const presetKey = (args.preset in PRESETS ? args.preset : "apex_hit_rate") as keyof typeof PRESETS;
   const scan = await scanSignals(args.ticker, args.timeframe, 1400, presetKey, args.targetWinRate);
+  // Safety: a live bridge must never receive orders derived from simulated
+  // prices. Real feeds only (bridge-mirrored broker history or live exchange).
+  const realFeed = scan.source === "bridge" || scan.source === "live";
+  if (controls.mode === "bridge" && !realFeed) {
+    await logEvent(
+      "warn",
+      "risk",
+      `dispatch verworfen: ${args.ticker} Quelle=${scan.source} — Live-Bridge handelt nur auf echten Broker-Kerzen`,
+    );
+    return {
+      dispatched: 0,
+      blocked: [
+        `kein Real-Feed fuer ${args.ticker} (Quelle: ${scan.source}) — im Modus bridge werden nur echte Broker-Kerzen gehandelt`,
+      ],
+      results: [],
+    };
+  }
   const bridges = await listBridges();
   const bridge = bridges[0];
   const equity = controls.mode === "metaapi" ? (bridge?.equity ?? 10_000) : bridge?.equity ?? 0;

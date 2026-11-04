@@ -53,7 +53,7 @@ def http(method, url, data=None, timeout=15):
         return 0, str(exc)
 
 MAGIC = 990011
-PY_VERSION = "py-1.12"
+PY_VERSION = "py-1.14"
 SUCCESS_RETCODES = (10008, 10009, 10010)
 
 CFG_NAME = "helix_config.ini"
@@ -259,25 +259,31 @@ def kv_get(body, key, default=""):
     return default
 
 def parse_order_line(line):
+    """Parse 'id|action|symbol|SIDE|vol|price|sl|tp|comment|...'.
+
+    IMPORTANT: the caller already stripped the 'order=' prefix, so field 0 IS
+    the order id. An off-by-one here previously turned every order into id=0
+    with symbol='SELL', which is why the bridge rejected its own orders.
+    """
     f = line.split("|")
-    if len(f) < 10:
+    if len(f) < 9:
         return None
     num = lambda i, fb=0.0: float(f[i]) if i < len(f) and f[i].replace(".", "", 1).replace("-", "", 1).isdigit() else fb
     return {
-        "id": int(num(1)),
-        "action": f[2],
-        "symbol": f[3],
-        "side": f[4].lower(),
-        "volume": num(5),
-        "price": num(6),
-        "sl": num(7),
-        "tp": num(8),
-        "comment": f[9],
-        "trail": num(10, 1.6),
-        "beR": num(11, 0.5),
-        "pF": num(12, 0.5),
-        "pR": num(13, 1.0),
-        "ttl": int(num(14, 90)),
+        "id": int(num(0)),
+        "action": f[1],
+        "symbol": f[2],
+        "side": f[3].lower(),
+        "volume": num(4),
+        "price": num(5),
+        "sl": num(6),
+        "tp": num(7),
+        "comment": f[8],
+        "trail": num(9, 1.6),
+        "beR": num(10, 0.5),
+        "pF": num(11, 0.5),
+        "pR": num(12, 1.0),
+        "ttl": int(num(13, 90)),
     }
 
 # --------------------------------------------------------------------- mt5 io
@@ -465,6 +471,7 @@ class Bridge:
         self.history_min = max(1, cp.getint("bridge", "history_minutes", fallback=30))
         self.history_tfs = [t.strip() for t in cp.get("bridge", "history_timeframes", fallback="1h,1d").split(",") if t.strip()]
         self.last_ingest = 0.0
+        self.ingest_retry_done = False
         self.feed_summary = ""
         self.resolved_symbols = []
         self.oms = Oms(self.server, self.token)
@@ -561,6 +568,7 @@ class Bridge:
         import json as _json
         mt5 = self.term.mt5
         parts = []
+        failures = []
         written = 0
         for sym in self.resolved_symbols or self.symbols:
             for tf in self.history_tfs:
@@ -588,10 +596,17 @@ class Bridge:
                     written += n
                     parts.append("%s/%s:%d" % (sym, tf, n))
                 else:
+                    failures.append((sym, tf))
                     hint("History-Ingest %s %s fehlgeschlagen: HTTP %d %s" % (sym, tf, status, text[:80]))
         self.feed_summary = ";".join(parts)
         if written:
             ok("Echte Broker-History gespiegelt: %d Kerzen (%s)" % (written, self.feed_summary))
+        if failures and not self.ingest_retry_done:
+            self.ingest_retry_done = True
+            self.last_ingest = time.time() - (self.history_min * 60 - 90)
+            hint("%d Ingest(s) fehlgeschlagen (%s) - Nachholversuch in ~90 s" % (len(failures), ", ".join("%s/%s" % t for t in failures)))
+        elif not failures:
+            self.ingest_retry_done = False
         return written
 
     def publish_instruments(self):
@@ -606,13 +621,15 @@ class Bridge:
                 self.cp.set("bridge", "symbols_resolved", ",".join(wanted))
                 save_cfg(self.cp)
                 ok("Broker-Angebot automatisch erkannt: %s" % ", ".join(wanted[:14]))
-        self.resolved_symbols = wanted
+        self.resolved_symbols = reported or wanted
+        reported = []
         for sym in wanted:
             if not self.term.mt5.symbol_select(sym, True):
                 continue
             si = self.term.mt5.symbol_info(sym)
             if si is None:
                 continue
+            reported.append(sym)
             lines.append(
                 "s=%s|%.8f|%.8f|%.8f|%.8f|%.8f|%d|%d|%d|%d|%.1f|%s|%.8f"
                 % (
@@ -636,7 +653,7 @@ class Bridge:
         body = ("type=symbols\ntoken=%s\n" % self.token) + "\n".join(lines) + "\ncount=%d\n" % len(lines)
         status, _ = http("POST", self.server + "/api/bridge/instruments", body)
         if status == 200:
-            ok("%d Broker-Symbole an den Server gemeldet: %s" % (len(lines), ", ".join(self.symbols)))
+            ok("%d Broker-Symbole an den Server gemeldet: %s" % (len(reported), ", ".join(reported)))
         else:
             hint("Symbol-Meldung fehlgeschlagen (HTTP %d)" % status)
 
@@ -763,8 +780,14 @@ class Bridge:
             self.ack(o["id"], "REJECTED", 0, "symbol not available on this terminal")
             self.rejected += 1
             return
+        ref = self.term.market_price(o["symbol"], o["side"])
+        if ref > 0 and o["price"] > 0 and abs(o["price"] - ref) / ref > 0.05:
+            err("%s -> PREIS-CHECK: Order-Preis %.5f weicht >5%% vom echten Markt %.5f ab (Signal aus anderem Feed) - verworfen" % (tag, o["price"], ref))
+            self.ack(o["id"], "REJECTED", 0, "price mismatch vs market (stale or non-real feed)")
+            self.rejected += 1
+            return
         if self.dry:
-            px = self.term.market_price(o["symbol"], o["side"])
+            px = ref
             hint("DRY RUN: %s @ %.5f SL %.5f TP %.5f  (nichts gesendet)" % (tag, px, o["sl"], o["tp"]))
             self.ack(o["id"], "REJECTED", 0, "dry run - no order sent")
             return
@@ -924,6 +947,11 @@ def self_test(cp):
         err("Server/Token-Check: HTTP %d -> %s" % (code, text[:160]))
         hint("Falls 'invalid token': %s loeschen und neu starten (Bridge registriert sich selbst)." % CFG_NAME)
         hint("Falls Verbindung fehlschlaegt: URL im Execution-Tab (blaues Feld) pruefen.")
+    probe = parse_order_line("42|OPEN|EURUSD|SELL|1.28|1.16000|1.16500|1.15500|HX-42|1.6|0.5|0.5|1.0|90")
+    if probe and probe["id"] == 42 and probe["symbol"] == "EURUSD" and probe["side"] == "sell" and abs(probe["price"] - 1.16) < 1e-9:
+        ok("Order-Parser korrekt (id/symbol/seite/preis stimmen).")
+    else:
+        err("ORDER-PARSER DEFEKT: %s" % probe)
     try:
         import MetaTrader5 as mt5
         if mt5.initialize():
