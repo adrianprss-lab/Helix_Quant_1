@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
           "autopilotSymbols",
           "autopilotPreset",
           "autopilotTimeframe",
+          "webhookUrl",
         ] as const;
         for (const k of booleans) if (typeof body[k] === "boolean") patch[k] = body[k];
         for (const k of numbers) if (typeof body[k] === "number" && Number.isFinite(body[k] as number)) patch[k] = body[k];
@@ -166,6 +167,18 @@ export async function POST(req: NextRequest) {
           riskSnapshot: { lossPerLot: sized.lossPerLot, riskAmount: sized.riskAmount, specSource: spec.source },
         });
         return Response.json({ ok: true, order, spec, sized });
+      }
+
+      case "webhook:test": {
+        const { notify } = await import("@/lib/exec/notify");
+        const sent = await notify(
+          "test",
+          "Webhook verbunden — Fills, Signals und Kills landen ab jetzt hier.",
+        );
+        return Response.json({
+          ok: sent,
+          message: sent ? "test message sent" : "kein webhook gesetzt oder zustellung fehlgeschlagen",
+        });
       }
 
       case "metaapi:accounts": {

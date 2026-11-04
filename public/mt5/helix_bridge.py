@@ -53,7 +53,7 @@ def http(method, url, data=None, timeout=15):
         return 0, str(exc)
 
 MAGIC = 990011
-PY_VERSION = "py-1.14"
+PY_VERSION = "py-1.15"
 SUCCESS_RETCODES = (10008, 10009, 10010)
 
 CFG_NAME = "helix_config.ini"
@@ -621,7 +621,6 @@ class Bridge:
                 self.cp.set("bridge", "symbols_resolved", ",".join(wanted))
                 save_cfg(self.cp)
                 ok("Broker-Angebot automatisch erkannt: %s" % ", ".join(wanted[:14]))
-        self.resolved_symbols = reported or wanted
         reported = []
         for sym in wanted:
             if not self.term.mt5.symbol_select(sym, True):
@@ -648,6 +647,7 @@ class Bridge:
                     si.trade_tick_value or 0.0,
                 )
             )
+        self.resolved_symbols = reported or wanted
         if not lines:
             return
         body = ("type=symbols\ntoken=%s\n" % self.token) + "\n".join(lines) + "\ncount=%d\n" % len(lines)

@@ -91,6 +91,7 @@ export const backtestRuns = pgTable(
     params: jsonb("params").$type<EnsembleParams>().notNull(),
     risk: jsonb("risk").$type<RiskProfile>().notNull(),
     metrics: jsonb("metrics").$type<BacktestMetrics>().notNull(),
+    equityCurve: jsonb("equity_curve").$type<unknown>(),
     attribution: jsonb("attribution").$type<unknown>(),
     walkForward: jsonb("walk_forward").$type<unknown>(),
     monteCarlo: jsonb("monte_carlo").$type<unknown>(),
@@ -356,6 +357,7 @@ export const executionControls = pgTable("execution_controls", {
   autopilotPreset: text("autopilot_preset").notNull().default("apex_hit_rate"),
   autopilotTimeframe: text("autopilot_timeframe").notNull().default("1h"),
   autopilotTarget: doublePrecision("autopilot_target").notNull().default(0.85),
+  webhookUrl: text("webhook_url"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

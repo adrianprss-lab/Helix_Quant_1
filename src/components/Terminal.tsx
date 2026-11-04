@@ -128,6 +128,66 @@ function fmtMoney(v: number): string {
   return Number.isFinite(v) ? v.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—";
 }
 
+interface PulseState {
+  bridges: { name: string; online: boolean; feedUpdatedAt: string | null }[];
+  controls: { autopilot: boolean; autopilotMinutes: number; autopilotTimeframe: string; mode: string; confirmMode: string };
+  counts: { held: number; queued: number };
+}
+
+function SystemPulse() {
+  const [st, setSt] = useState<PulseState | null>(null);
+  useEffect(() => {
+    let on = true;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/exec/status", { cache: "no-store" });
+        const j = (await r.json()) as PulseState;
+        if (on) setSt(j);
+      } catch {
+        /* pulse ist dekorativ */
+      }
+    };
+    void load();
+    const t = setInterval(load, 5000);
+    return () => {
+      on = false;
+      clearInterval(t);
+    };
+  }, []);
+  if (!st) return null;
+  const b = st.bridges.find((x) => x.online) ?? st.bridges[0];
+  const chips: { k: string; v: string; ok: boolean }[] = [
+    { k: "bridge", v: b?.online ? `online · ${b.name}` : "offline", ok: Boolean(b?.online) },
+    {
+      k: "feed",
+      v: b?.feedUpdatedAt ? `${new Date(b.feedUpdatedAt).toISOString().slice(11, 16)} UTC` : "—",
+      ok: Boolean(b?.feedUpdatedAt),
+    },
+    {
+      k: "autopilot",
+      v: st.controls.autopilot ? `an · ${st.controls.autopilotMinutes} min · ${st.controls.autopilotTimeframe}` : "aus",
+      ok: st.controls.autopilot,
+    },
+    { k: "queue", v: `${st.counts.held} held · ${st.counts.queued} queued`, ok: true },
+    { k: "modus", v: `${st.controls.mode} · ${st.controls.confirmMode}`, ok: st.controls.mode !== "paper" },
+  ];
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {chips.map((chip) => (
+        <span
+          key={chip.k}
+          className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] ${
+            chip.ok ? "border-white/[0.08] bg-white/[0.03] text-slate-300" : "border-[#eb5757]/30 bg-[#eb5757]/[0.06] text-[#eb5757]"
+          }`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${chip.ok ? "bg-[#4cb782]" : "bg-[#eb5757]"}`} />
+          {chip.k}: {chip.v}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function Kpi({
   label,
   value,
@@ -198,6 +258,7 @@ export default function Terminal({ initialRuns }: { initialRuns: RunSummary[] })
   const [run, setRun] = useState<RunResponse | null>(null);
   const [runs, setRuns] = useState(initialRuns);
   const [error, setError] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
   const [signals, setSignals] = useState<SignalCandidateView[]>([]);
   const [paper, setPaper] = useState<PaperView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -530,6 +591,19 @@ export default function Terminal({ initialRuns }: { initialRuns: RunSummary[] })
             </Panel>
           ) : (
             <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <SystemPulse />
+                <button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(`${window.location.origin}/share/${run.runId}`);
+                    setShareCopied(true);
+                    setTimeout(() => setShareCopied(false), 1600);
+                  }}
+                  className="ml-auto rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 font-mono text-[10px] text-slate-300 transition hover:border-[#5e6ad2]/50 hover:text-[#98a0ff]"
+                >
+                  {shareCopied ? "link kopiert ✓" : "report-link kopieren"}
+                </button>
+              </div>
               <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4 xl:grid-cols-6">
                 <Kpi
                   label="Hit rate"

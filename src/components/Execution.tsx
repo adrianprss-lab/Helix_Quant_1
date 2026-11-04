@@ -37,6 +37,7 @@ interface Controls {
   autopilotPreset: string;
   autopilotTimeframe: string;
   autopilotTarget: number;
+  webhookUrl: string | null;
 }
 
 interface Bridge {
@@ -689,6 +690,29 @@ InpDryRun      = true     // ← start with dry run, flip to false only after yo
                 className="mt-1 w-full rounded border border-slate-800 bg-slate-950 px-2 py-1 font-mono text-[11px] text-slate-200"
               />
             </label>
+          </div>
+          <div className="mt-3 grid grid-cols-1 items-end gap-2.5 md:grid-cols-[1fr_auto]">
+            <label className="block">
+              <span className="block text-[10px] uppercase tracking-wider text-slate-500">
+                Webhook für Push-Meldungen (Telegram / Discord / eigene URL)
+              </span>
+              <input
+                value={c.webhookUrl ?? ""}
+                onChange={(e) => setDraft({ ...c, webhookUrl: e.target.value })}
+                placeholder="https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<ID>"
+                className="mt-1 w-full rounded border border-slate-800 bg-slate-950 px-2 py-1.5 font-mono text-[11px] text-slate-200"
+              />
+            </label>
+            <button
+              onClick={async () => {
+                await control("update", c as unknown as Record<string, unknown>);
+                await control("webhook:test");
+              }}
+              disabled={busy}
+              className="rounded border border-slate-700 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-slate-300 hover:border-emerald-500/50 hover:text-emerald-400 disabled:opacity-40"
+            >
+              speichern + test
+            </button>
           </div>
           <div className="mt-3 flex flex-wrap gap-3">
             {(

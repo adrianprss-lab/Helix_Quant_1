@@ -549,6 +549,7 @@ async function persistRun(
         params: result.params,
         risk: result.risk,
         metrics: result.inSample.metrics,
+        equityCurve: result.inSample.equityCurve,
         attribution: { attribution: extras.attribution, health: extras.health, featureImportance: extras.featureImportance },
         walkForward: result.walkForward,
         monteCarlo: result.monteCarlo,

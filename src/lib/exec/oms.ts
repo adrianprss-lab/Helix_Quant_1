@@ -25,6 +25,7 @@ import {
 } from "./protocol";
 import { evaluateRisk, isWeekendWindow, type RiskContext, type RiskDecision } from "./risk";
 import { lastKnock } from "./bridgeAuth";
+import { notify } from "./notify";
 
 /* ------------------------------- instrument ------------------------------- */
 
@@ -482,6 +483,12 @@ export async function createOrder(input: {
     order.id,
     order.bridgeId,
   );
+  if (order.state === "HELD") {
+    void notify(
+      "held",
+      `${order.symbol} ${order.side.toUpperCase()} ${order.volume} @ ${order.entryPrice} · p(win)=${order.metaProb ?? "?"} · wartet auf Freigabe`,
+    );
+  }
   return { ...order, comment: orderComment(order.id) };
 }
 
@@ -632,6 +639,14 @@ export async function ackOrder(payload: AckPayload): Promise<OrderRow | null> {
     order.bridgeId,
     payload as unknown as Record<string, unknown>,
   );
+  if (payload.state === "FILLED") {
+    void notify(
+      "fill",
+      `${order.symbol} ${order.side.toUpperCase()} ${order.volume} filled @ ${payload.fillPrice ?? order.fillPrice ?? "?"} · retcode ${payload.retcode ?? "?"}`,
+    );
+  } else if (payload.state === "REJECTED") {
+    void notify("reject", `${order.symbol} ${order.side.toUpperCase()} rejected: ${payload.errorText ?? payload.retcodeText ?? "unbekannt"}`);
+  }
   return updated[0] ?? null;
 }
 
@@ -1099,6 +1114,7 @@ export async function flattenAll(reason: string) {
     undefined,
     bridgeId === null ? undefined : bridgeId,
   );
+  void notify("kill", reason);
   return { queued, cancelled: cancelled.length, reason };
 }
 
