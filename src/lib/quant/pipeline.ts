@@ -28,6 +28,7 @@ import {
 import { withDeflatedSharpe } from "./metrics";
 import { ALPHA_MODELS, ALPHA_REGISTRY } from "./strategies";
 import { clamp, stdev } from "./math";
+const clamp01Smc = (x: number) => Math.max(0.05, Math.min(0.95, x));
 
 export type PresetKey =
   | "apex_hit_rate"
@@ -704,7 +705,60 @@ export async function scanSignals(
   const series = await loadSeries(ticker, timeframe, Math.max(600, bars), true);
   const candles = series.candles;
   const params = { ...preset.params };
-  const ens = buildEnsemble(candles, params, timeframe);
+    // ------------------------------------------------ SMC live signal branch
+  if (presetKey === "smc_gold_m15") {
+    const { runSmcBacktest, SMC_DEFAULT } = await import("./smc");
+    const smcParams = {
+      ...SMC_DEFAULT,
+      entryTfSec: TIMEFRAME_SECONDS[timeframe],
+      barsPerDay: BARS_PER_DAY[timeframe],
+      riskPerTrade: preset.risk.riskPerTrade,
+      initialEquity: preset.risk.initialEquity,
+    };
+    const smc = runSmcBacktest(candles, smcParams, true);
+    const last = candles[candles.length - 1];
+    const pend = smc.pending;
+    const candidates: SignalCandidate[] = pend
+      ? [
+          {
+            ticker,
+            timeframe,
+            barTs: last.ts,
+            direction: pend.dir === 1 ? "long" : "short",
+            alphaKey: "smc_liquidity",
+            score: pend.dir,
+            metaProb: clamp01Smc(0.5 + pend.rr * 0.08),
+            confidence: clamp01Smc(pend.rr / 3),
+            entryPrice: pend.entry,
+            stopPrice: pend.stop,
+            targetPrice: pend.t2,
+            regime: "range",
+            votes: {},
+            atrPct: (pend.atr / last.close) * 100,
+            trendFilter: `SMC: ${smc.checklist[0]} · RR ${pend.rr.toFixed(2)}`,
+            expectedHoldBars: 48,
+          },
+        ]
+      : [];
+    return {
+      ticker,
+      timeframe,
+      source: series.source,
+      candles: candles.slice(-180),
+      candidates,
+      tape: [],
+      health: { metaAccuracy: 0, metaLogLoss: 0, metaSamples: smc.stats.entries, metaRefits: 0, probDispersion: 0, probMean: 0, infoCoefficient: 0 },
+      threshold: 0.55,
+      regime: smc.checklist[0].includes("bullish") ? "trend_up" : smc.checklist[0].includes("bearish") ? "trend_down" : "range",
+      price: last.close,
+      atrPct: (smc.pending?.atr ?? 0) / last.close * 100 || 0,
+      metaFeatureImportance: [],
+      alphaIc: {},
+      votes: {},
+    };
+  }
+
+const ens = buildEnsemble(candles, params, timeframe);
   const risk: RiskProfile = { ...preset.risk, barsPerDay: BARS_PER_DAY[timeframe] };
 
   const cal = (() => {

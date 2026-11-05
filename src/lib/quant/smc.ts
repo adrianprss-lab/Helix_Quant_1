@@ -245,7 +245,21 @@ function lookupIndex(tsArr: number[], ts: number): number {
 
 /* --------------------------------- the engine ------------------------------ */
 
+export interface SmcPending {
+  dir: 1 | -1;
+  entry: number;
+  stop: number;
+  t1: number;
+  t2: number;
+  t3: number;
+  rr: number;
+  atr: number;
+  poiTop: number;
+  poiBottom: number;
+}
+
 export interface SmcResult {
+  pending: SmcPending | null;
   trades: Trade[];
   equityCurve: EquityPoint[];
   stats: {
@@ -259,7 +273,7 @@ export interface SmcResult {
   checklist: string[];
 }
 
-export function runSmcBacktest(entryCandles: Candle[], params: SmcParams): SmcResult {
+export function runSmcBacktest(entryCandles: Candle[], params: SmcParams, livePeek = false): SmcResult {
   const tf = params.entryTfSec;
   const h1 = resample(entryCandles, 3600);
   const h4 = resample(entryCandles, 14400);
@@ -284,6 +298,7 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams): SmcRe
   let taps = 0;
   let confirms = 0;
   let entries = 0;
+  let pending: SmcPending | null = null;
   let longCount = 0;
   let shortCount = 0;
 
@@ -506,7 +521,11 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams): SmcRe
               const t2 = Math.abs(t2Cand - entryPrice) > risk * 1.4 ? t2Cand : entryPrice + setupDir * risk * 2;
               const t3 = Math.abs(t3Cand - entryPrice) > risk * 2 ? t3Cand : entryPrice + setupDir * risk * 3;
               const rr = (Math.abs(t2 - entryPrice) * params.partial1 + Math.abs(t3 - entryPrice) * params.partial2 + Math.abs(t1 - entryPrice) * 0.2) / risk;
-              if (rr >= params.minRR) {
+              if (rr >= params.minRR && livePeek && i === n - 1) {
+                pending = { dir: setupDir, entry: entryPrice, stop, t1, t2, t3, rr, atr: a, poiTop: entryPoi.top, poiBottom: entryPoi.bottom };
+                state = 0;
+                entryPoi = null;
+              } else if (rr >= params.minRR) {
                 const equity = cash;
                 const qty = (equity * params.riskPerTrade) / risk;
                 pos = {
@@ -609,6 +628,7 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams): SmcRe
   ];
 
   return {
+    pending,
     trades,
     equityCurve,
     stats: {
