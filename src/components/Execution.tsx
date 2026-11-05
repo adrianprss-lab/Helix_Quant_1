@@ -215,6 +215,9 @@ export default function Execution() {
   const [copied, setCopied] = useState<string | null>(null);
   const [metaAccounts, setMetaAccounts] = useState<{ id: string; name?: string; login?: number; state?: string }[]>([]);
   const [testToken, setTestToken] = useState("");
+  const [passcode, setPasscode] = useState("");
+  const [passError, setPassError] = useState<string | null>(null);
+
   const [testResult, setTestResult] = useState<string | null>(null);
   const origin = typeof window !== "undefined" ? window.location.origin : "https://YOUR-HELIX-HOST";
 
@@ -337,9 +340,6 @@ InpDryRun      = true     // ← start with dry run, flip to false only after yo
   if (!c) {
     return <div className="p-6 font-mono text-xs text-slate-500">loading execution state…</div>;
   }
-
-  const [passcode, setPasscode] = useState("");
-  const [passError, setPassError] = useState<string | null>(null);
 
   if (status?.locked) {
     return (
