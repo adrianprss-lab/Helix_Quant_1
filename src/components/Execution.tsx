@@ -811,7 +811,7 @@ InpDryRun      = true     // ← start with dry run, flip to false only after yo
                   onChange={(e) => setDraft({ ...c, autopilotTimeframe: e.target.value })}
                   className="mt-1 w-full rounded border border-slate-800 bg-slate-950 px-2 py-1.5 font-mono text-[11px] text-slate-200"
                 >
-                  {["15m", "1h", "4h", "1d"].map((t) => (
+                  {["5m", "15m", "1h", "4h", "1d"].map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>

@@ -9,7 +9,7 @@ import { matchTicker } from "@/lib/exec/symbolMap";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-const TF: Timeframe[] = ["15m", "1h", "4h", "1d"];
+const TF: Timeframe[] = ["5m", "15m", "1h", "4h", "1d"];
 const MAX_BARS = 6000;
 
 interface IngestBody {

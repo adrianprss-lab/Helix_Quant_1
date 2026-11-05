@@ -111,7 +111,7 @@ export const PRESET_CATALOG: { key: string; name: string; tagline: string; targe
   { key: "capital_defense", name: "CAPITAL DEFENSE", tagline: "Drawdown first, ultra-selective, low size", target: 0.72 },
 ];
 
-const TIMEFRAMES = ["15m", "1h", "4h", "1d"] as const;
+const TIMEFRAMES = ["5m", "15m", "1h", "4h", "1d"] as const;
 const TICKERS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "EURUSD", "XAUUSD", "SPX500", "NDX100"];
 
 type Tab = "overview" | "attribution" | "validation" | "ledger" | "signals" | "paper" | "execution";

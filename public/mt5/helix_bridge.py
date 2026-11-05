@@ -560,8 +560,8 @@ class Bridge:
                 break
         return found
 
-    TF_CONST = {"15m": "TIMEFRAME_M15", "1h": "TIMEFRAME_H1", "4h": "TIMEFRAME_H4", "1d": "TIMEFRAME_D1"}
-    TF_COUNT = {"15m": 2500, "1h": 5000, "4h": 3000, "1d": 2600}
+    TF_CONST = {"5m": "TIMEFRAME_M5", "15m": "TIMEFRAME_M15", "1h": "TIMEFRAME_H1", "4h": "TIMEFRAME_H4", "1d": "TIMEFRAME_D1"}
+    TF_COUNT = {"5m": 3000, "15m": 2500, "1h": 5000, "4h": 3000, "1d": 2600}
 
     def ingest_history(self):
         """Mirror the broker's REAL candles into the research database."""

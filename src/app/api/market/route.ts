@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   if (!UNIVERSE.some((u) => u.ticker === ticker)) {
     return Response.json({ ok: false, error: "unknown instrument" }, { status: 400 });
   }
-  const tf: Timeframe = (["15m", "1h", "4h", "1d"] as const).includes(timeframe) ? timeframe : "1h";
+  const tf: Timeframe = (["5m", "15m", "1h", "4h", "1d"] as const).includes(timeframe) ? timeframe : "1h";
   const series = await loadSeries(ticker, tf, limit, url.searchParams.get("live") !== "0");
   const candles = series.candles;
   const last = candles[candles.length - 1];

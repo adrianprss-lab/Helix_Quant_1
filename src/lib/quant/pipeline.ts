@@ -152,7 +152,7 @@ export interface PipelineRequest {
 
 export function normaliseRequest(raw: Partial<PipelineRequest>): PipelineRequest {
   const preset = (raw.preset && PRESETS[raw.preset] ? raw.preset : "apex_hit_rate") as PresetKey;
-  const timeframe: Timeframe = (["15m", "1h", "4h", "1d"] as const).includes(raw.timeframe as Timeframe)
+  const timeframe: Timeframe = (["5m", "15m", "1h", "4h", "1d"] as const).includes(raw.timeframe as Timeframe)
     ? (raw.timeframe as Timeframe)
     : "1h";
   return {

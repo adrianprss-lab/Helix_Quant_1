@@ -4,9 +4,10 @@ import { candles as candlesTable } from "@/db/schema";
 import type { Candle } from "./types";
 import { clamp, hashSeed, mulberry32 } from "./math";
 
-export type Timeframe = "15m" | "1h" | "4h" | "1d";
+export type Timeframe = "5m" | "15m" | "1h" | "4h" | "1d";
 
 export const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
+  "5m": 300,
   "15m": 900,
   "1h": 3600,
   "4h": 14400,
@@ -14,6 +15,7 @@ export const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
 };
 
 export const BARS_PER_DAY: Record<Timeframe, number> = {
+  "5m": 288,
   "15m": 96,
   "1h": 24,
   "4h": 6,
@@ -162,6 +164,7 @@ function round6(x: number): number {
 /* ------------------------------ live ingestion ---------------------------- */
 
 const BINANCE_INTERVAL: Record<Timeframe, string> = {
+  "5m": "5m",
   "15m": "15m",
   "1h": "1h",
   "4h": "4h",
