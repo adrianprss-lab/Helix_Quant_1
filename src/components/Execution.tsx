@@ -197,11 +197,8 @@ function Field({
 
 const PRESET_CATALOG: { key: string; name: string }[] = [
   { key: "apex_hit_rate", name: "APEX HIT-RATE" },
-  { key: "micro_scalper", name: "MICRO SCALPER" },
-  { key: "balanced_core", name: "BALANCED CORE" },
-  { key: "regime_trend", name: "REGIME TREND" },
-  { key: "gold_daily_swing", name: "GOLD DAILY SWING" },
   { key: "real_gold_swing", name: "REAL EDGE · GOLD DAILY" },
+  { key: "smc_gold_m15", name: "SMC GOLD · M15 LIQUIDITY" },
   { key: "capital_defense", name: "CAPITAL DEFENSE" },
 ];
 

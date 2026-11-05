@@ -281,9 +281,9 @@ export async function loadCachedCandles(
 }
 
 /** Bridge-fed history counts as fresh when its newest bar is recent enough. */
-export function isSeriesFresh(lastTs: number, timeframe: Timeframe): boolean {
+export function isSeriesFresh(lastTs: number, timeframe: Timeframe, maxAgeSec?: number): boolean {
   const tfSec = TIMEFRAME_SECONDS[timeframe];
-  const maxAge = timeframe === "1d" ? 4 * 86400 : tfSec * 3;
+  const maxAge = maxAgeSec ?? (timeframe === "1d" ? 4 * 86400 : tfSec * 3);
   return Date.now() / 1000 - lastTs <= maxAge;
 }
 
@@ -303,11 +303,17 @@ export async function loadSeries(
   timeframe: Timeframe,
   limit: number,
   preferLive = true,
+  bridgeMaxAgeSec?: number,
 ): Promise<SeriesLoadResult> {
   if (preferLive) {
     // 1) bridge-fed REAL broker history wins over everything when fresh
+    //    (backtests may pass a wider window; live signals keep the tight one)
     const cached = await loadCachedCandles(ticker, timeframe, limit);
-    if (cached && cached.candles.length >= Math.min(200, limit) && isSeriesFresh(cached.lastTs, timeframe)) {
+    if (
+      cached &&
+      cached.candles.length >= Math.min(200, limit) &&
+      isSeriesFresh(cached.lastTs, timeframe, bridgeMaxAgeSec)
+    ) {
       return {
         ticker,
         timeframe,

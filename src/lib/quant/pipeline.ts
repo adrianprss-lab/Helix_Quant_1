@@ -13,7 +13,7 @@ import type {
   Trade,
 } from "./types";
 import type { Timeframe } from "./data";
-import { BARS_PER_DAY, loadSeries } from "./data";
+import { BARS_PER_DAY, TIMEFRAME_SECONDS, loadSeries } from "./data";
 import { DEFAULT_PARAMS, buildEnsemble, ensembleHealth, metaFeatureImportance } from "./ensemble";
 import { runBacktest } from "./backtest";
 import { calibrateThresholdRange } from "./research";
@@ -31,11 +31,8 @@ import { clamp, stdev } from "./math";
 
 export type PresetKey =
   | "apex_hit_rate"
-  | "balanced_core"
-  | "regime_trend"
-  | "micro_scalper"
-  | "gold_daily_swing"
   | "real_gold_swing"
+  | "smc_gold_m15"
   | "capital_defense";
 
 export interface PresetDefinition {
@@ -85,93 +82,6 @@ export const PRESETS: Record<PresetKey, PresetDefinition> = {
     },
     risk: { ...BASE_RISK, riskPerTrade: 0.007, targetVol: 0.45, maxConcurrentPositions: 3 },
   },
-  balanced_core: {
-    key: "balanced_core",
-    name: "BALANCED CORE",
-    tagline: "Equal-weight blend of reversion, trend and statistical alpha",
-    description:
-      "Volatility targeted blend across all fourteen alpha models with adaptive information-coefficient weighting. Symmetric exits, medium holding period.",
-    targetWinRate: 0.62,
-    params: {
-      ...DEFAULT_PARAMS,
-      confidenceFloor: 0.2,
-      metaThreshold: 0.6,
-      metaWeight: 0.55,
-      stopAtrMult: 1.9,
-      targetAtrMult: 1.25,
-      tp1Fraction: 0.4,
-      trailAtrMult: 1.8,
-      timeStopBars: 16,
-    },
-    risk: { ...BASE_RISK, riskPerTrade: 0.009, targetVol: 0.55, maxConcurrentPositions: 4 },
-  },
-  regime_trend: {
-    key: "regime_trend",
-    name: "REGIME TREND RIDER",
-    tagline: "Momentum/breakout stack that only fires in persistent regimes",
-    description:
-      "Gated to trending and expansion regimes. Wide targets, chandelier-style trailing exits, ADX/Hurst confirmation on every entry.",
-    targetWinRate: 0.48,
-    params: {
-      ...DEFAULT_PARAMS,
-      confidenceFloor: 0.26,
-      metaThreshold: 0.56,
-      metaWeight: 0.45,
-      regimeGate: 0.95,
-      stopAtrMult: 2.1,
-      targetAtrMult: 2.4,
-      tp1Fraction: 0.3,
-      trailAtrMult: 2.6,
-      breakevenAtR: 0.9,
-      timeStopBars: 28,
-    },
-    risk: { ...BASE_RISK, riskPerTrade: 0.011, targetVol: 0.65, maxConcurrentPositions: 2 },
-  },
-  micro_scalper: {
-    key: "micro_scalper",
-    name: "MICROSTRUCTURE SCALPER",
-    tagline: "Sub-5-bar auction scalps with an extreme hit rate",
-    description:
-      "Pattern + VWAP + StochRSI micro-scalps. Takes 0.4 ATR very quickly and cuts on a 2-bar time stop. Highest win rate, thinnest edge per trade, most sensitive to fees.",
-    targetWinRate: 0.88,
-    params: {
-      ...DEFAULT_PARAMS,
-      confidenceFloor: 0.1,
-      metaThreshold: 0.7,
-      metaWeight: 0.78,
-      regimeGate: 0.85,
-      stopAtrMult: 2.4,
-      targetAtrMult: 0.55,
-      tp1Fraction: 0.6,
-      trailAtrMult: 1.3,
-      breakevenAtR: 0.4,
-      timeStopBars: 4,
-    },
-    risk: { ...BASE_RISK, riskPerTrade: 0.005, targetVol: 0.35, maxConcurrentPositions: 5, takerFeeBps: 2 },
-  },
-  gold_daily_swing: {
-    key: "gold_daily_swing",
-    name: "GOLD DAILY SWING",
-    tagline: "Für XAUUSD 1d: Trend-following Swings mit weiten Stops, tiefem Meta-Gate",
-    description:
-      "Auf Tages-Charts tragen Trend- und Breakout-Modelle am zuverlässigsten. Dieses Preset gibt Trades deshalb Luft: weiter Stop, gestaffelter Ausstieg über Tage, niedriges Kosten/Edge-Verhältnis. Entstanden aus deinem Befund, dass Gold 1d der einzige stabile Lauf war.",
-    targetWinRate: 0.68,
-    params: {
-      ...DEFAULT_PARAMS,
-      confidenceFloor: 0.16,
-      metaThreshold: 0.6,
-      metaWeight: 0.5,
-      regimeGate: 0.55,
-      stopAtrMult: 2.4,
-      targetAtrMult: 1.7,
-      tp1Fraction: 0.4,
-      trailAtrMult: 2.4,
-      breakevenAtR: 0.8,
-      timeStopBars: 40,
-      weightWindow: 220,
-    },
-    risk: { ...BASE_RISK, riskPerTrade: 0.01, targetVol: 0.3, kellyFraction: 0.3, maxConcurrentPositions: 2 },
-  },
   real_gold_swing: {
     key: "real_gold_swing",
     name: "REAL EDGE · GOLD DAILY",
@@ -193,6 +103,16 @@ export const PRESETS: Record<PresetKey, PresetDefinition> = {
       timeStopBars: 12,
     },
     risk: { ...BASE_RISK, riskPerTrade: 0.012, targetVol: 0.25, kellyFraction: 0.3, maxConcurrentPositions: 1 },
+  },
+  smc_gold_m15: {
+    key: "smc_gold_m15",
+    name: "SMC GOLD · M15 LIQUIDITY",
+    tagline: "Dein Blueprint als Engine: BoS-Bias, POI-Tap, 15m-Confirmation, Liquidity-Targets",
+    description:
+      "Multi-Timeframe-Struktur nach Operator-Blueprint: Daily/4h-Bias über Break of Structure, Range-Verkleinerung über 4h→1h, Entry nachdem der Markt in einen HTF-POI getappt ist und der 15m-Chart mit BoS/ChoCh bestätigt — Einstieg am letzten LTF-POI, Stop hinter der Zone, Teilprofite an gegnerischem POI, Trendline-Liquidity und Buyside-Liquidity. Mehrere Trades pro Tag auf Gold.",
+    targetWinRate: 0.55,
+    params: { ...DEFAULT_PARAMS },
+    risk: { ...BASE_RISK, riskPerTrade: 0.0075, targetVol: 0, maxConcurrentPositions: 1 },
   },
   capital_defense: {
     key: "capital_defense",
@@ -249,6 +169,10 @@ export function normaliseRequest(raw: Partial<PipelineRequest>): PipelineRequest
   };
 }
 
+function warmuplessCut(n: number): number {
+  return Math.floor(n * 0.7);
+}
+
 function trimTrades(trades: Trade[], limit = 260): Trade[] {
   if (trades.length <= limit) return trades;
   const step = trades.length / limit;
@@ -278,7 +202,7 @@ export async function runPipeline(req: PipelineRequest): Promise<PipelineResult 
   const t0 = Date.now();
   const preset = PRESETS[req.preset];
   const deadline = t0 + (req.budgetMs ?? 42_000);
-  const series = await loadSeries(req.ticker, req.timeframe, req.bars, req.preferLive);
+  const series = await loadSeries(req.ticker, req.timeframe, req.bars, req.preferLive, 7 * 86400);
   const candles = series.candles;
   const barsPerDay = BARS_PER_DAY[req.timeframe];
   const risk: RiskProfile = { ...preset.risk, barsPerDay };
@@ -288,6 +212,79 @@ export async function runPipeline(req: PipelineRequest): Promise<PipelineResult 
     `Data source: ${series.source} (${candles.length} bars, ${req.timeframe})`,
     `Preset: ${preset.name} — target hit rate ${(req.targetWinRate * 100).toFixed(1)}%`,
   ];
+
+  // ---------------------------------------------------- SMC structure engine
+  if (req.preset === "smc_gold_m15") {
+    const { runSmcBacktest, smcToBacktestResult, SMC_DEFAULT } = await import("./smc");
+    const smcParams = {
+      ...SMC_DEFAULT,
+      entryTfSec: TIMEFRAME_SECONDS[req.timeframe] ?? 900,
+      barsPerDay: BARS_PER_DAY[req.timeframe],
+      riskPerTrade: preset.risk.riskPerTrade,
+      initialEquity: preset.risk.initialEquity,
+    };
+    const t1 = Date.now();
+    const smc = runSmcBacktest(candles, smcParams);
+    const full = smcToBacktestResult(smc, smcParams);
+    const cut = warmuplessCut(candles.length);
+    const isTrades = full.trades.filter((t) => t.exitTs <= candles[cut].ts);
+    const oosTrades = full.trades.filter((t) => t.exitTs > candles[cut].ts);
+    const isCurve = full.equityCurve.filter((e) => e.index <= cut);
+    const oosCurve = full.equityCurve.filter((e) => e.index > cut);
+    const { computeMetrics: cm, monthlyReturns: mr, rolledWinRate: rw } = await import("./metrics");
+    const mk = (trades: typeof full.trades, curve: typeof full.equityCurve) =>
+      cm({
+        trades,
+        equityCurve: curve,
+        initialEquity: smcParams.initialEquity,
+        warmupBars: 0,
+        periodsPerYear: smcParams.barsPerDay * 365,
+        feeTotal: trades.reduce((a, t) => a + t.fees, 0),
+        slippageTotal: trades.reduce((a, t) => a + t.slippage, 0),
+        notionalTraded: trades.reduce((a, t) => a + t.qty * t.entryPrice, 0),
+      });
+    const inMetrics = mk(isTrades, isCurve);
+    const oosMetrics = mk(oosTrades, oosCurve);
+    const mc = monteCarloBootstrap({
+      result: { ...full, trades: isTrades, equityCurve: isCurve },
+      iterations: 800,
+      initialEquity: smcParams.initialEquity,
+      riskPerTrade: smcParams.riskPerTrade,
+      targetWinRate: req.targetWinRate,
+    });
+    const result: PipelineResult & { runId: number } = {
+      runId: 0,
+      label: `${preset.name} · ${req.ticker} ${req.timeframe}`,
+      ticker: req.ticker,
+      timeframe: req.timeframe,
+      dataSource: series.source,
+      preset: req.preset,
+      bars: candles.length,
+      candles: candles.slice(-260),
+      params,
+      risk: preset.risk,
+      inSample: { ...full, trades: isTrades, equityCurve: trimCurve(isCurve), metrics: inMetrics },
+      outOfSample: { ...full, trades: oosTrades, equityCurve: trimCurve(oosCurve), metrics: oosMetrics },
+      walkForward: null,
+      monteCarlo: mc,
+      pbo: null,
+      optimization: { enabled: false, trials: [], bestObjective: 0, generations: 0, evaluations: 0 },
+      targetWinRate: req.targetWinRate,
+      achievedWinRate: inMetrics.winRate,
+      durationMs: Date.now() - t1,
+      diagnostics: [
+        `SMC-Engine auf ${series.source}-Kerzen (${req.timeframe}): ${smc.stats.taps} POI-Taps, ${smc.stats.confirms} Confirmations, ${smc.stats.entries} Entries`,
+        ...smc.checklist,
+        `Hold-out (letzte 30%): ${oosTrades.length} Trades, WR ${(oosMetrics.winRate * 100).toFixed(1)}%, PF ${oosMetrics.profitFactor.toFixed(2)}, Expectancy ${oosMetrics.expectancyR.toFixed(3)}R`,
+      ],
+    };
+    result.runId = await persistRun(result, {
+      attribution: full.attribution,
+      health: { metaAccuracy: 0, metaLogLoss: 0, metaSamples: 0, metaRefits: 0, probDispersion: 0, probMean: 0, infoCoefficient: 0 },
+      featureImportance: [],
+    });
+    return result;
+  }
 
   const ens = buildEnsemble(candles, params, req.timeframe);
   const warmup = Math.min(candles.length - 60, Math.max(240, Math.floor(candles.length * 0.06)));

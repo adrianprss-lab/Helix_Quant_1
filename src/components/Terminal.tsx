@@ -106,11 +106,8 @@ interface PaperView {
 
 export const PRESET_CATALOG: { key: string; name: string; tagline: string; target: number }[] = [
   { key: "apex_hit_rate", name: "APEX HIT-RATE", tagline: "Meta-labelled mean reversion, engineered for ≥85% hit rate", target: 0.86 },
-  { key: "micro_scalper", name: "MICROSTRUCTURE SCALPER", tagline: "Sub-6-bar auction scalps, extreme hit rate, thin edge", target: 0.88 },
-  { key: "balanced_core", name: "BALANCED CORE", tagline: "All-weather blend across every alpha family", target: 0.62 },
-  { key: "regime_trend", name: "REGIME TREND RIDER", tagline: "Momentum stack gated to persistent regimes", target: 0.48 },
-  { key: "gold_daily_swing", name: "GOLD DAILY SWING", tagline: "XAUUSD 1d: Trend-Swings mit Luft zum Atmen", target: 0.68 },
   { key: "real_gold_swing", name: "REAL EDGE · GOLD DAILY", tagline: "Auf echten Kerzen getunt — XAUUSD 1d, Profit vor Winrate", target: 0.6 },
+  { key: "smc_gold_m15", name: "SMC GOLD · M15 LIQUIDITY", tagline: "Dein Blueprint: BoS-Bias, POI-Tap, 15m-Confirm, Liquidity-Targets", target: 0.55 },
   { key: "capital_defense", name: "CAPITAL DEFENSE", tagline: "Drawdown first, ultra-selective, low size", target: 0.72 },
 ];
 
