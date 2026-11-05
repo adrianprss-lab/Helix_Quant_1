@@ -35,6 +35,7 @@ export type PresetKey =
   | "regime_trend"
   | "micro_scalper"
   | "gold_daily_swing"
+  | "real_gold_swing"
   | "capital_defense";
 
 export interface PresetDefinition {
@@ -170,6 +171,28 @@ export const PRESETS: Record<PresetKey, PresetDefinition> = {
       weightWindow: 220,
     },
     risk: { ...BASE_RISK, riskPerTrade: 0.01, targetVol: 0.3, kellyFraction: 0.3, maxConcurrentPositions: 2 },
+  },
+  real_gold_swing: {
+    key: "real_gold_swing",
+    name: "REAL EDGE · GOLD DAILY",
+    tagline: "Auf echten Broker-Kerzen getunt: XAUUSD 1d, Profit vor Winrate",
+    description:
+      "Parameter entstammen einem Profit-First-Optimierungslauf gegen echte Broker-Daily-Kerzen (PF 1.48, Expectancy +0.12R, Walk-Forward-Konsistenz 67%). Breite Stops, weites Ziel, starkes Trailing, hohes Meta-Gate. Ehrlicher Befund derselben Runde: EURUSD zeigt auf echten Kerzen in keinem Timeframe einen Edge — dieses Preset handelt deshalb bewusst nur Gold.",
+    targetWinRate: 0.6,
+    params: {
+      ...DEFAULT_PARAMS,
+      confidenceFloor: 0.07,
+      metaThreshold: 0.77,
+      metaWeight: 0.92,
+      regimeGate: 0.53,
+      stopAtrMult: 1.5,
+      targetAtrMult: 1.33,
+      tp1Fraction: 0.58,
+      trailAtrMult: 2.58,
+      breakevenAtR: 1.5,
+      timeStopBars: 12,
+    },
+    risk: { ...BASE_RISK, riskPerTrade: 0.012, targetVol: 0.25, kellyFraction: 0.3, maxConcurrentPositions: 1 },
   },
   capital_defense: {
     key: "capital_defense",

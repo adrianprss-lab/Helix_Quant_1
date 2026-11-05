@@ -110,6 +110,7 @@ export const PRESET_CATALOG: { key: string; name: string; tagline: string; targe
   { key: "balanced_core", name: "BALANCED CORE", tagline: "All-weather blend across every alpha family", target: 0.62 },
   { key: "regime_trend", name: "REGIME TREND RIDER", tagline: "Momentum stack gated to persistent regimes", target: 0.48 },
   { key: "gold_daily_swing", name: "GOLD DAILY SWING", tagline: "XAUUSD 1d: Trend-Swings mit Luft zum Atmen", target: 0.68 },
+  { key: "real_gold_swing", name: "REAL EDGE · GOLD DAILY", tagline: "Auf echten Kerzen getunt — XAUUSD 1d, Profit vor Winrate", target: 0.6 },
   { key: "capital_defense", name: "CAPITAL DEFENSE", tagline: "Drawdown first, ultra-selective, low size", target: 0.72 },
 ];
 
