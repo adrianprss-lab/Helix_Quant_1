@@ -23,6 +23,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const { operatorUnlocked } = await import("@/app/api/auth/operator/route");
+  if (!(await operatorUnlocked(req))) {
+    return Response.json({ ok: false, error: "operator passcode required" }, { status: 401 });
+  }
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;

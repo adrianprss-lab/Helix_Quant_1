@@ -7,6 +7,8 @@ export const maxDuration = 120;
 export async function GET(req: NextRequestLike) {
   const url = new URL(req.url);
   const status = await execStatus();
+  const { passcodeConfigured, operatorUnlocked } = await import("@/app/api/auth/operator/route");
+  const locked = passcodeConfigured() && !(await operatorUnlocked(req as never));
   const [orders, open, closed, events, instruments] = await Promise.all([
     listOrders({ limit: 60 }),
     listPositions(undefined, "open"),
@@ -26,6 +28,7 @@ export async function GET(req: NextRequestLike) {
   }
   return Response.json({
     ok: true,
+    locked,
     ...status,
     orders,
     positions: { open, closed },

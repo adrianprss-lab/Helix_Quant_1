@@ -139,6 +139,7 @@ interface StatusResponse {
   bridges: Bridge[];
   onlineBridge: Bridge | null;
   lastKnock: { at: number; path: string; tokenPrefix: string; valid: boolean; count: number } | null;
+  locked?: boolean;
   counts: { held: number; queued: number; dispatched: number; filled: number; failed: number; openPositions: number };
   openNotional: number;
   openPnl: number;
@@ -334,6 +335,43 @@ InpDryRun      = true     // ← start with dry run, flip to false only after yo
 
   if (!c) {
     return <div className="p-6 font-mono text-xs text-slate-500">loading execution state…</div>;
+  }
+
+  const [passcode, setPasscode] = useState("");
+  const [passError, setPassError] = useState<string | null>(null);
+
+  if (status?.locked) {
+    return (
+      <div className="gcard mx-auto max-w-md rounded-2xl p-6">
+        <h3 className="font-mono text-[11px] uppercase tracking-[0.18em] text-slate-400">terminal gesperrt</h3>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+          Dieser Server laeuft mit Operator-Passcode. Einmal eingeben, Session haelt 7 Tage.
+        </p>
+        <input
+          type="password"
+          value={passcode}
+          onChange={(e) => setPasscode(e.target.value)}
+          placeholder="Passcode"
+          className="mt-3 w-full rounded border border-slate-800 bg-slate-950 px-2 py-1.5 font-mono text-[12px] text-slate-200"
+        />
+        {passError ? <p className="mt-1.5 font-mono text-[10px] text-[#eb5757]">{passError}</p> : null}
+        <button
+          onClick={async () => {
+            const res = await fetch("/api/auth/operator", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ passcode }),
+            });
+            const json = (await res.json()) as { ok: boolean; error?: string };
+            if (json.ok) window.location.reload();
+            else setPassError(json.error ?? "fehlgeschlagen");
+          }}
+          className="mt-3 w-full rounded border border-[#5e6ad2]/50 bg-[#5e6ad2]/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider text-[#98a0ff] hover:bg-[#5e6ad2]/20"
+        >
+          entsperren
+        </button>
+      </div>
+    );
   }
 
   return (

@@ -13,6 +13,10 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const { operatorUnlocked } = await import("@/app/api/auth/operator/route");
+  if (!(await operatorUnlocked(req))) {
+    return Response.json({ ok: false, error: "operator passcode required" }, { status: 401 });
+  }
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -31,6 +35,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const { operatorUnlocked } = await import("@/app/api/auth/operator/route");
+  if (!(await operatorUnlocked(req))) {
+    return Response.json({ ok: false, error: "operator passcode required" }, { status: 401 });
+  }
   const url = new URL(req.url);
   const id = Number(url.searchParams.get("id"));
   if (!Number.isFinite(id)) return Response.json({ ok: false, error: "id required" }, { status: 400 });

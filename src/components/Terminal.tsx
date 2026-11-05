@@ -24,7 +24,7 @@ import {
   TrialsScatter,
 } from "./charts";
 
-interface RunResponse {
+export interface RunResponse {
   ok: boolean;
   error?: string;
   runId: number;
@@ -244,7 +244,13 @@ export interface RunSummary {
   createdAt: string;
 }
 
-export default function Terminal({ initialRuns }: { initialRuns: RunSummary[] }) {
+export default function Terminal({
+  initialRuns,
+  initialRun = null,
+}: {
+  initialRuns: RunSummary[];
+  initialRun?: RunResponse | null;
+}) {
   const [ticker, setTicker] = useState("BTCUSDT");
   const [timeframe, setTimeframe] = useState<string>("1h");
   const [bars, setBars] = useState(3200);
@@ -255,7 +261,7 @@ export default function Terminal({ initialRuns }: { initialRuns: RunSummary[] })
   const [monteCarlo, setMonteCarlo] = useState(true);
   const [tab, setTab] = useState<Tab>("overview");
   const [running, setRunning] = useState(false);
-  const [run, setRun] = useState<RunResponse | null>(null);
+  const [run, setRun] = useState<RunResponse | null>(initialRun);
   const [runs, setRuns] = useState(initialRuns);
   const [error, setError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
