@@ -500,7 +500,10 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams, livePe
           entryPoi = null;
         } else {
           const buf = a * params.poiBufferAtr;
-          const touched = setupDir === 1 ? bar.low <= entryPoi.top + buf : bar.high >= entryPoi.bottom - buf;
+          // sauberer Tap: die Zone darf NICHT durchgapt werden (open muss
+          // ausserhalb der Zone starten), sonst invertiert die Geometrie
+          const cleanTap = setupDir === 1 ? bar.open > entryPoi.top : bar.open < entryPoi.bottom;
+          const touched = cleanTap && (setupDir === 1 ? bar.low <= entryPoi.top + buf : bar.high >= entryPoi.bottom - buf);
           if (touched) {
             const entryPrice = setupDir === 1 ? Math.min(bar.open, entryPoi.top + buf) : Math.max(bar.open, entryPoi.bottom - buf);
             const stop = setupDir === 1 ? entryPoi.bottom - buf * 2 : entryPoi.top + buf * 2;
@@ -521,11 +524,20 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams, livePe
               const t2 = Math.abs(t2Cand - entryPrice) > risk * 1.4 ? t2Cand : entryPrice + setupDir * risk * 2;
               const t3 = Math.abs(t3Cand - entryPrice) > risk * 2 ? t3Cand : entryPrice + setupDir * risk * 3;
               const rr = (Math.abs(t2 - entryPrice) * params.partial1 + Math.abs(t3 - entryPrice) * params.partial2 + Math.abs(t1 - entryPrice) * 0.2) / risk;
-              if (rr >= params.minRR && livePeek && i === n - 1) {
+              // Geometrie-Validierung: Stop hinterm Entry, Targets davor,
+              // Reihenfolge monoton, Risiko mindestens 0.2 ATR bedeutsam.
+              // Ohne diese Prüfung konnte ein durchgapter POI den Stop auf die
+              // Gewinnseite drehen und +1R-Phantom-Trades produzieren.
+              const sane =
+                risk >= a * 0.2 &&
+                (setupDir === 1
+                  ? stop < entryPrice - 1e-9 && t1 > entryPrice + 1e-9 && t2 > t1 && t3 > t2
+                  : stop > entryPrice + 1e-9 && t1 < entryPrice - 1e-9 && t2 < t1 && t3 < t2);
+              if (rr >= params.minRR && sane && livePeek && i === n - 1) {
                 pending = { dir: setupDir, entry: entryPrice, stop, t1, t2, t3, rr, atr: a, poiTop: entryPoi.top, poiBottom: entryPoi.bottom };
                 state = 0;
                 entryPoi = null;
-              } else if (rr >= params.minRR) {
+              } else if (rr >= params.minRR && sane) {
                 const equity = cash;
                 const qty = (equity * params.riskPerTrade) / risk;
                 pos = {

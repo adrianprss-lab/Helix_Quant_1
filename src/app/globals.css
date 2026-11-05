@@ -345,3 +345,55 @@ body::after {
   opacity: 0.05;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");
 }
+
+/* ===========================================================================
+   PRO DESK (XAUUSD SaaS Terminal) — scoped under .hx-pro
+   Palette nach Spec: Tiefdunkel #080A0F, Gold sparsam, Neon-Statusfarben,
+   1px-Hairlines #161B22, Mono für alle Zahlen.
+=========================================================================== */
+.hx-pro {
+  --hx-bg: #080a0f;
+  --hx-panel: #0b0e14;
+  --hx-panel-2: #0e1219;
+  --hx-line: #161b22;
+  --hx-line-soft: #10141b;
+  --hx-gold: #d4af37;
+  --hx-gold-hi: #f3c63f;
+  --hx-bull: #00e676;
+  --hx-bear: #ff1744;
+  --hx-info: #00b0ff;
+  --hx-warn: #ffc400;
+  --hx-text: #c9d1d9;
+  --hx-dim: #6e7681;
+  --hx-mono: "SF Mono", "JetBrains Mono", "Cascadia Code", ui-monospace, Menlo, Consolas, monospace;
+  --hx-sans: "Inter", "Geist Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  background: var(--hx-bg);
+  color: var(--hx-text);
+  font-family: var(--hx-sans);
+}
+.hx-pro .mono { font-family: var(--hx-mono); font-variant-numeric: tabular-nums; }
+.hx-pro .hair { border-color: var(--hx-line); }
+
+/* tick flash: Zell-HINTERGRUND für 120ms, 10% Deckung — Text bleibt ruhig */
+@keyframes hx-flash-up { 0% { background-color: rgba(0, 230, 118, 0.1); } 100% { background-color: transparent; } }
+@keyframes hx-flash-dn { 0% { background-color: rgba(255, 23, 68, 0.1); } 100% { background-color: transparent; } }
+.hx-pro .flash-up { animation: hx-flash-up 0.12s linear 1; }
+.hx-pro .flash-dn { animation: hx-flash-dn 0.12s linear 1; }
+
+/* margin-level alarme */
+@keyframes hx-warn { 0%, 100% { background-color: rgba(255, 196, 0, 0.08); } 50% { background-color: rgba(255, 196, 0, 0.22); } }
+@keyframes hx-crit { 0%, 100% { background-color: rgba(255, 23, 68, 0.12); } 50% { background-color: rgba(255, 23, 68, 0.4); } }
+.hx-pro .margin-warn { animation: hx-warn 1.6s ease-in-out infinite; }
+.hx-pro .margin-crit { animation: hx-crit 0.7s steps(2, jump-none) infinite; }
+
+/* panic button puls */
+@keyframes hx-panic { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 23, 68, 0.5); } 50% { box-shadow: 0 0 0 10px rgba(255, 23, 68, 0); } }
+.hx-pro .panic { animation: hx-panic 1.4s ease-out infinite; }
+
+/* spread-ausweitung highlight */
+@keyframes hx-spread { 0%, 100% { border-color: rgba(255, 196, 0, 0.25); } 50% { border-color: rgba(255, 196, 0, 0.8); } }
+.hx-pro .spread-hot { animation: hx-spread 1s ease-in-out infinite; }
+
+.hx-pro ::-webkit-scrollbar { width: 8px; height: 8px; }
+.hx-pro ::-webkit-scrollbar-thumb { background: #1b212b; border-radius: 8px; }
+.hx-pro ::selection { background: rgba(212, 175, 55, 0.25); }

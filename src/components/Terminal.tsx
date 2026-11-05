@@ -371,6 +371,12 @@ export default function Terminal({
             {run ? `run #${run.runId} · ${run.dataSource} feed` : "engine idle"}
           </span>
           <div className="ml-auto flex items-center gap-2 font-mono text-[10px]">
+            <a
+              href="/pro"
+              className="rounded-full border border-[#d4af37]/40 bg-[#d4af37]/10 px-3 py-1 text-[#f3c63f] transition hover:bg-[#d4af37]/20"
+            >
+              PRO DESK ↗
+            </a>
             <span className="hidden rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-slate-400 md:inline">
               {run ? `${run.ticker} · ${run.timeframe}` : "kein instrument"}
             </span>
