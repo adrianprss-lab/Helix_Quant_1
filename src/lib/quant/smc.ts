@@ -44,7 +44,7 @@ export const SMC_DEFAULT: SmcParams = {
   poiBufferAtr: 0.15,
   expiryBars: 64,
   timeStopBars: 96,
-  minRR: 1.6,
+  minRR: 1.4,
   eqTolAtr: 0.25,
   initialEquity: 100_000,
   barsPerDay: 96,
@@ -284,6 +284,7 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams, livePe
   const s240 = computeStructure(h4, 2, params.eqTolAtr);
   const sD = computeStructure(d1, 2, params.eqTolAtr);
 
+  const tsE = entryCandles.map((c) => c.ts);
   const ts60 = h1.map((c) => c.ts);
   const ts240 = h4.map((c) => c.ts);
   const tsD = d1.map((c) => c.ts);
@@ -329,6 +330,7 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams, livePe
 
   // setup state machine
   let state: 0 | 1 | 2 = 0;
+  let directEntry = false;
   let setupDir: 1 | -1 = 1;
   let expiry = 0;
   let entryPoi: Poi | null = null;
@@ -349,6 +351,80 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams, livePe
       p.remaining = 0;
       p.reason = reason;
     }
+  };
+
+  /**
+   * Einheitliche Entry-Geometrie fuer BEIDE Eintrittspfade (Blueprint 5.1
+   * Confirmation-Touch und 5.2 Limit-am-POI). Stop hinter der Zone, Targets
+   * an gegnerischem POI / Liquidity-Pool / HTF-Range-Extrem, inkl. der
+   * Geometrie-Validierung gegen invertierte Stops (Phantom-+1R-Fix).
+   */
+  const openOrPending = (entryPrice: number, i: number, a: number): Pos | null => {
+    if (!entryPoi) return null;
+    const buf = a * params.poiBufferAtr;
+    // Stop hinter der Zone MIT ATR-Atemraum: Gold-15m-Rauschen frisst sonst
+    // jeden Zone-Kanten-Stop in der ersten Kerze (hold=1-Stopserien).
+    const stopBuf = Math.max(buf * 2, a * 0.5);
+    const stop = setupDir === 1 ? entryPoi.bottom - stopBuf : entryPoi.top + stopBuf;
+    const risk = Math.abs(entryPrice - stop);
+    if (risk <= 1e-9) return null;
+    const oppPois = s15.pois.filter((pp) => pp.dir !== setupDir && (setupDir === 1 ? pp.bottom > entryPrice : pp.top < entryPrice));
+    const t1Cand = oppPois.length ? (setupDir === 1 ? oppPois[0].bottom : oppPois[oppPois.length - 1].top) : Number.NaN;
+    const poolsAhead = s15.pools.filter((pp) => !pp.taken && (setupDir === 1 ? pp.price > entryPrice && pp.side === "buy" : pp.price < entryPrice && pp.side === "sell"));
+    const i240l = lookupIndex(ts240, entryCandles[i].ts);
+    const t2Cand = poolsAhead.length ? poolsAhead[0].price : setupDir === 1 ? (s15.lastSH[i] ?? entryPrice + risk * 2) : (s15.lastSL[i] ?? entryPrice - risk * 2);
+    const t3Cand = setupDir === 1 ? (i240l >= 0 ? (s240.lastSH[i240l] ?? t2Cand) : t2Cand) : i240l >= 0 ? (s240.lastSL[i240l] ?? t2Cand) : t2Cand;
+    // Target-Leiter: Struktur zuerst (gegnerischer POI / Liquidity-Pool /
+    // HTF-Extrem), aber MONOTON erzwungen. Liegt echte Struktur zu nah oder
+    // hinter uns, faellt der Bot auf feste R-Vielfache zurueck — wie ein
+    // Trader, der seine Teilprofite an fixen Multiples plant, wenn vor ihm
+    // nur noch Luft ist.
+    const ahead = (v: number) => (setupDir === 1 ? v > entryPrice : v < entryPrice);
+    const t1 = Number.isFinite(t1Cand) && ahead(t1Cand) && Math.abs(t1Cand - entryPrice) > risk * 0.8 ? t1Cand : entryPrice + setupDir * risk * 0.8;
+    const t2Raw = Number.isFinite(t2Cand) && ahead(t2Cand) ? t2Cand : entryPrice + setupDir * risk * 1.5;
+    const t2 = setupDir === 1 ? Math.max(t2Raw, t1 + risk * 0.7) : Math.min(t2Raw, t1 - risk * 0.7);
+    const t3Raw = Number.isFinite(t3Cand) && ahead(t3Cand) ? t3Cand : entryPrice + setupDir * risk * 2.5;
+    const t3 = setupDir === 1 ? Math.max(t3Raw, t2 + risk * 1.0) : Math.min(t3Raw, t2 - risk * 1.0);
+    const rr = (Math.abs(t2 - entryPrice) * params.partial1 + Math.abs(t3 - entryPrice) * params.partial2 + Math.abs(t1 - entryPrice) * 0.2) / risk;
+    const sane =
+      risk >= a * 0.2 &&
+      (setupDir === 1 ? stop < entryPrice - 1e-9 && t3 > t2 && t2 > t1 && t1 > entryPrice : stop > entryPrice + 1e-9 && t3 < t2 && t2 < t1 && t1 < entryPrice);
+    if (rr < params.minRR || !sane) return null;
+    if (livePeek && i === n - 1) {
+      pending = { dir: setupDir, entry: entryPrice, stop, t1, t2, t3, rr, atr: a, poiTop: entryPoi.top, poiBottom: entryPoi.bottom };
+      return null;
+    }
+    const equity = cash;
+    const qty = (equity * params.riskPerTrade) / risk;
+    const created: Pos = {
+      dir: setupDir,
+      entry: entryPrice,
+      stop,
+      t1,
+      t2,
+      t3,
+      qty,
+      remaining: qty,
+      risk,
+      openIdx: i,
+      realized: -entryPrice * qty * costRate,
+      fees: entryPrice * qty * costRate,
+      mae: 0,
+      mfe: 0,
+      p1: false,
+      p2: false,
+      exitTs: entryCandles[i].ts,
+      exitPrice: entryPrice,
+      exitQtyW: 0,
+      exitQty: 0,
+      reason: "target",
+    };
+    cash -= entryPrice * qty * costRate;
+    entries++;
+    if (setupDir === 1) longCount++;
+    else shortCount++;
+    entryPoi.used = true;
+    return created;
   };
 
   for (let i = warm; i < n; i++) {
@@ -442,28 +518,52 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams, livePe
             const buf = a * params.poiBufferAtr * 4;
             const tapped = overall === 1 ? bar.low <= poi.top + buf && bar.low >= poi.bottom - buf * 3 : bar.high >= poi.bottom - buf && bar.high <= poi.top + buf * 3;
             if (tapped) {
-              poi.used = true;
+              // Blueprint 5.1 vs 5.2: wurde auf dem Weg in den POI die
+              // Entry-TF-Struktur gegen uns gebrochen, erst Re-Flip abwarten;
+              // sonst liegt die Limit direkt am POI (haeufiger, blueprint-konform)
+              const from = lookupIndex(tsE, poi.ts);
+              let broken = false;
+              for (let j = Math.max(warm, from); j <= i; j++) {
+                if (overall === 1 ? s15.bosDn[j] || s15.chochDn[j] : s15.bosUp[j] || s15.chochUp[j]) {
+                  broken = true;
+                  break;
+                }
+              }
               setupDir = overall;
-              state = 1;
-              expiry = i + params.expiryBars;
+              entryPoi = poi;
               taps++;
+              if (broken) {
+                state = 1;
+                expiry = i + 96;
+                directEntry = false;
+              } else {
+                state = 2;
+                expiry = i + 48;
+                directEntry = true;
+                confirms++;
+              }
               break;
             }
           }
-          if (state === 1) break;
+          if (state !== 0) break;
         }
         // Setup-Klasse B (Blueprint 5.2/aggressiv): Strukturflip im 15m selbst,
         // in Richtung des HTF-Bias — bringt die Trade-Frequenz auf mehrere pro Tag
         if (state === 0) {
+          // Trend-Continuation (Operator-Idee): nur wenn 4h- und 1h-Bias
+          // gleichgerichtet sind, zaehlt der Entry-TF-Flip als Setup
+          const bias60 = i60 >= 0 ? s60.bias[i60] : 0;
+          const trendAligned = bias4 !== 0 && bias4 === bias60;
           const flip = overall === 1 ? s15.chochUp[i] || s15.bosUp[i] : s15.chochDn[i] || s15.bosDn[i];
-          if (flip) {
+          if (flip && trendAligned) {
             const fresh = s15.pois.filter((pp) => !pp.used && pp.dir === overall && pp.ts >= entryCandles[Math.max(0, i - 10)].ts);
             const poi = fresh.length ? fresh[fresh.length - 1] : null;
             if (poi) {
               setupDir = overall;
               entryPoi = poi;
               state = 2;
-              expiry = i + params.expiryBars;
+              expiry = i + 48;
+              directEntry = false;
               confirms++;
             }
           }
@@ -476,7 +576,8 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams, livePe
         else if (conf) {
           confirms++;
           state = 2;
-          expiry = i + params.expiryBars;
+          expiry = i + 48;
+          directEntry = false;
           // entry POI: last LTF POI left by the confirming impulse
           const fresh = s15.pois.filter((p) => !p.used && p.dir === setupDir && p.ts >= entryCandles[Math.max(0, i - 12)].ts);
           entryPoi = fresh.length ? fresh[fresh.length - 1] : null;
@@ -495,81 +596,21 @@ export function runSmcBacktest(entryCandles: Candle[], params: SmcParams, livePe
         } else if (i > expiry) state = 0;
       } else if (state === 2 && entryPoi) {
         const against = setupDir === 1 ? s15.bosDn[i] : s15.bosUp[i];
-        if (against) {
+        const burned = setupDir === 1 ? bar.close < entryPoi.bottom : bar.close > entryPoi.top;
+        if (against || burned) {
+          entryPoi.used = true;
           state = 0;
           entryPoi = null;
         } else {
+          // Entry erst auf der REJECTION-CANDLE: Touch in die Zone UND Close
+          // wieder ausserhalb = Zone hat gehalten. Kein Entry am blinden Touch.
           const buf = a * params.poiBufferAtr;
-          // sauberer Tap: die Zone darf NICHT durchgapt werden (open muss
-          // ausserhalb der Zone starten), sonst invertiert die Geometrie
-          const cleanTap = setupDir === 1 ? bar.open > entryPoi.top : bar.open < entryPoi.bottom;
-          const touched = cleanTap && (setupDir === 1 ? bar.low <= entryPoi.top + buf : bar.high >= entryPoi.bottom - buf);
-          if (touched) {
-            const entryPrice = setupDir === 1 ? Math.min(bar.open, entryPoi.top + buf) : Math.max(bar.open, entryPoi.bottom - buf);
-            const stop = setupDir === 1 ? entryPoi.bottom - buf * 2 : entryPoi.top + buf * 2;
-            const risk = Math.abs(entryPrice - stop);
-            if (risk > 1e-9) {
-              // targets: opposing LTF POI -> liquidity pool -> HTF range extreme
-              const oppPois = s15.pois.filter((p) => p.dir !== setupDir && (setupDir === 1 ? p.bottom > entryPrice : p.top < entryPrice));
-              const t1Cand = oppPois.length ? (setupDir === 1 ? oppPois[0].bottom : oppPois[oppPois.length - 1].top) : Number.NaN;
-              const poolsAhead = s15.pools.filter((p) => !p.taken && (setupDir === 1 ? p.price > entryPrice && p.side === "buy" : p.price < entryPrice && p.side === "sell"));
-              const t2Cand = poolsAhead.length ? poolsAhead[0].price : setupDir === 1 ? (s15.lastSH[i] ?? entryPrice + risk * 2) : (s15.lastSL[i] ?? entryPrice - risk * 2);
-              const t3Cand =
-                setupDir === 1
-                  ? (i240 >= 0 ? (s240.lastSH[i240] ?? t2Cand) : t2Cand)
-                  : i240 >= 0
-                    ? (s240.lastSL[i240] ?? t2Cand)
-                    : t2Cand;
-              const t1 = Number.isFinite(t1Cand) && Math.abs(t1Cand - entryPrice) > risk * 0.8 ? t1Cand : entryPrice + setupDir * risk * 1.2;
-              const t2 = Math.abs(t2Cand - entryPrice) > risk * 1.4 ? t2Cand : entryPrice + setupDir * risk * 2;
-              const t3 = Math.abs(t3Cand - entryPrice) > risk * 2 ? t3Cand : entryPrice + setupDir * risk * 3;
-              const rr = (Math.abs(t2 - entryPrice) * params.partial1 + Math.abs(t3 - entryPrice) * params.partial2 + Math.abs(t1 - entryPrice) * 0.2) / risk;
-              // Geometrie-Validierung: Stop hinterm Entry, Targets davor,
-              // Reihenfolge monoton, Risiko mindestens 0.2 ATR bedeutsam.
-              // Ohne diese Prüfung konnte ein durchgapter POI den Stop auf die
-              // Gewinnseite drehen und +1R-Phantom-Trades produzieren.
-              const sane =
-                risk >= a * 0.2 &&
-                (setupDir === 1
-                  ? stop < entryPrice - 1e-9 && t1 > entryPrice + 1e-9 && t2 > t1 && t3 > t2
-                  : stop > entryPrice + 1e-9 && t1 < entryPrice - 1e-9 && t2 < t1 && t3 < t2);
-              if (rr >= params.minRR && sane && livePeek && i === n - 1) {
-                pending = { dir: setupDir, entry: entryPrice, stop, t1, t2, t3, rr, atr: a, poiTop: entryPoi.top, poiBottom: entryPoi.bottom };
-                state = 0;
-                entryPoi = null;
-              } else if (rr >= params.minRR && sane) {
-                const equity = cash;
-                const qty = (equity * params.riskPerTrade) / risk;
-                pos = {
-                  dir: setupDir,
-                  entry: entryPrice,
-                  stop,
-                  t1,
-                  t2,
-                  t3,
-                  qty,
-                  remaining: qty,
-                  risk,
-                  openIdx: i,
-                  realized: -entryPrice * qty * costRate,
-                  fees: entryPrice * qty * costRate,
-                  mae: 0,
-                  mfe: 0,
-                  p1: false,
-                  p2: false,
-                  exitTs: bar.ts,
-                  exitPrice: entryPrice,
-                  exitQtyW: 0,
-                  exitQty: 0,
-                  reason: "target" as ExitReason,
-                };
-                cash -= entryPrice * qty * costRate;
-                entries++;
-                if (setupDir === 1) longCount++;
-                else shortCount++;
-                entryPoi.used = true;
-              }
-            }
+          const rej =
+            setupDir === 1
+              ? bar.low <= entryPoi.top + buf && bar.close > entryPoi.top
+              : bar.high >= entryPoi.bottom - buf && bar.close < entryPoi.bottom;
+          if (rej) {
+            pos = openOrPending(bar.close, i, a);
             state = 0;
             entryPoi = null;
           } else if (i > expiry) {
